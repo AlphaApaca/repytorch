@@ -1,6 +1,6 @@
 # PyTorch 基础复习
 
-目标：把官方教程里的知识点变成自己能解释、能从空文件写出、能定位错误的小程序。当前项目从零开始，针对 AutoDL 的 RTX 5090、PyTorch 2.8.0、Python 3.12、CUDA 12.8 环境。
+目标：把官方教程里的知识点变成自己能解释、能从空文件写出、能定位错误的小程序。当前远端已实测为 RTX 5090、PyTorch 2.12.1+cu130、Python 3.12.3、CUDA 13.0。日常操作见 [常用命令速查](COMMANDS.md)。
 
 ## 1. 从本机 VS Code 连接 AutoDL
 
@@ -85,7 +85,7 @@ scp -rP <端口> \
 
 `scp` 的端口参数是大写 `-P`。密码只在终端提示处输入，不要写入项目文件。
 
-若本机和远端都可能编辑代码，使用私有 Git 仓库会更可靠：Git 记录历史并在两边发生不同修改时明确报告冲突。当前项目还没有初始化 Git；准备好远端仓库后，可在本机初始化并推送，再在服务器的空目录中克隆。`.gitignore` 已排除数据集、训练输出和常见模型权重。
+若本机和远端都可能编辑代码，使用私有 Git 仓库会更可靠：Git 记录历史并在两边发生不同修改时明确报告冲突。当前项目已经初始化 Git 并跟踪 `origin/main`；`.gitignore` 已排除数据集、训练输出和常见模型权重。
 
 ### 在远端 VS Code 使用 Codex
 
@@ -108,7 +108,7 @@ which python
 python scripts/check_gpu.py
 ```
 
-期望看到 PyTorch 2.8.0、PyTorch 构建对应的 CUDA 12.8、`CUDA available: True`，以及 RTX 5090 的设备名称；脚本还会实际在 GPU 上做一次矩阵乘法。`nvidia-smi` 显示的 CUDA Version 是驱动支持的版本，不要求与 `torch.version.cuda` 的数字完全相同。
+当前实测输出为 PyTorch 2.12.1+cu130、PyTorch CUDA 13.0、`CUDA available: True`，以及 RTX 5090 的设备名称；脚本还会实际在 GPU 上做一次矩阵乘法。`nvidia-smi` 显示的 CUDA Version 是驱动支持的版本，不要求与 `torch.version.cuda` 的数字完全相同。
 
 若 GPU 检查失败，先比较远端终端的 `which python` 与 VS Code 选中的解释器，再看 `nvidia-smi` 和 `python -m pip show torch`。确认问题之前，不要覆盖镜像里预装的 PyTorch。
 
@@ -129,7 +129,7 @@ python exercises/01_tensor_autograd.py
 ## 4. 后续复习顺序
 
 以官方 [Learn the Basics](https://docs.pytorch.org/tutorials/beginner/basics/) 为主线，每学一个主题就写一个最小例子，并在笔记中回答“输入形状、输出形状、设备、梯度从哪里来”。
-教程网站会更新；遇到版本差异时，查 [PyTorch 2.8 API 文档](https://docs.pytorch.org/docs/2.8/index.html)。
+教程网站会更新；遇到版本差异时，查 [PyTorch 2.12 API 文档](https://docs.pytorch.org/docs/2.12/)。
 
 | 阶段 | 内容 | 练习产出 |
 | --- | --- | --- |
