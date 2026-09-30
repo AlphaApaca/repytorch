@@ -2,6 +2,8 @@
 
 本项目采用下面的工作流：**本机编写并推送代码，AutoDL 服务器拉取代码并运行**。
 
+本机 M4 的完整配置见 [`docs/local-mac.md`](docs/local-mac.md)。
+
 ## 当前已验证环境
 
 验证日期：2026-09-21
@@ -26,7 +28,8 @@ cd /root/autodl-tmp/repytorch
 nvidia-smi
 which python
 python scripts/check_gpu.py
-python exercises/01_tensor_autograd.py
+python tutorials/official_basics/01_tensors/walkthrough.py
+python practice/fundamentals/01_tensor_autograd.py
 ```
 
 ## 每次学习最常用的流程
@@ -137,13 +140,43 @@ CUDA matrix multiplication: OK
 
 `nvidia-smi` 中的 CUDA Version 表示驱动支持的 CUDA 版本；`torch.version.cuda` 表示当前 PyTorch 构建使用的 CUDA 版本。
 
-## 运行练习
+## 本机 M4 与 MPS
+
+激活本地环境：
+
+```bash
+cd /Users/alpaca/workplace/repytorch
+conda activate repytorch
+```
+
+检查 Apple GPU 加速：
+
+```bash
+python scripts/check_mps.py
+```
+
+成功标志：
+
+```text
+MPS built: True
+MPS available: True
+MPS matrix multiplication: OK
+```
+
+## 运行教程与练习
+
+运行当前官方教程复现：
+
+```bash
+cd /root/autodl-tmp/repytorch
+python tutorials/official_basics/01_tensors/walkthrough.py
+```
 
 运行第一课：
 
 ```bash
 cd /root/autodl-tmp/repytorch
-python exercises/01_tensor_autograd.py
+python practice/fundamentals/01_tensor_autograd.py
 ```
 
 当前练习的关键正确结果：
@@ -158,7 +191,7 @@ w.grad: tensor([3., 5., 7.], device='cuda:0')
 以后运行其他练习：
 
 ```bash
-python exercises/<练习文件名>.py
+python practice/<分类>/<练习文件名>.py
 ```
 
 ## 用 tmux 运行较长任务
@@ -172,7 +205,7 @@ tmux new -s train
 在会话里启动程序，例如：
 
 ```bash
-python train.py
+python projects/<项目目录>/train.py
 ```
 
 暂时离开但让程序继续运行：先按 `Ctrl+B`，松开后再按 `D`。

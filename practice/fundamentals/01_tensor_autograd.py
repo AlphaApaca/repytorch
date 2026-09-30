@@ -1,10 +1,19 @@
-"""第一天：用一个小例子检查张量形状、设备和自动求导。"""
+"""闭卷练习：用一个小例子检查张量形状、设备和自动求导。"""
+
 
 import torch
 
 
+def select_device() -> torch.device:
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
 def main() -> None:
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = select_device()
     x = torch.arange(6, dtype=torch.float32, device=device).reshape(2, 3)
     w = torch.tensor([1.0, 2.0, 3.0], device=device, requires_grad=True)
 

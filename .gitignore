@@ -17,7 +17,8 @@ env/
 # Datasets, training outputs, and model weights
 data/
 datasets/
-outputs/
+outputs/*
+!outputs/README.md
 runs/
 logs/
 checkpoints/
