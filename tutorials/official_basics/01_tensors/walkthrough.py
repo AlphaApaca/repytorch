@@ -6,7 +6,7 @@ Target remote environment: PyTorch 2.12.1+cu130 on RTX 5090.
 """
 
 import torch
-
+import numpy as np
 
 def select_device() -> torch.device:
     if torch.cuda.is_available():
