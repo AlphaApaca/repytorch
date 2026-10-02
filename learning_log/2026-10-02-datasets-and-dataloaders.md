@@ -1,3 +1,12 @@
+---
+publish: true
+date: 2026-10-02
+category: learning-log
+tags: [PyTorch, DataLoader]
+summary: "理解 Dataset 与 DataLoader 的职责，并完成 FashionMNIST 数据加载练习。"
+comments: true
+---
+
 # 2026-10-02 · Datasets & DataLoaders
 
 ## 今天的目标
