@@ -1,0 +1,24 @@
+---
+publish: true
+date: 2026-10-03
+category: note
+tags: [PyTorch, transform]
+summary: ""
+comments: true
+---
+
+# Transforms
+
+## 一句话解释
+Data does not always come in its final processed form that is required for training machine learning algorithms. We use transforms to perform some manipulation of the data and make it suitable for training.
+数据并不总是以训练机器学习算法所需的最终处理形式出现。我们使用Transforms对数据进行一些操作，使其适合于训练。
+
+## 最小例子
+lambda transforms
+
+```python
+target_transform = v2.Lambda(
+    lambda y: F.one_hot(torch.tensor(y), num_classes=10).float()
+)
+```
+Lambda transforms apply any user-defined lambda function. Here, we use torch.nn.functional.one_hot to turn the integer label into a one-hot encoded tensor of size 10 (the number of labels in our dataset), then cast it to float to match the expected dtype.

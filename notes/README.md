@@ -3,6 +3,15 @@
 笔记用于保存自己的理解，内容围绕“能否解释和排错”展开。每篇建议使用以下结构：
 
 ```markdown
+---
+publish: true
+date: 2026-xx-xx
+category: note
+tags: [PyTorch, ]
+summary: ""
+comments: true
+---
+
 # 主题
 
 ## 一句话解释
