@@ -1,3 +1,12 @@
+---
+publish: true
+date: 2026-10-02
+category: note
+tags: [PyTorch, DataLoader]
+summary: "Dataset 与 DataLoader 的职责小记"
+comments: true
+---
+
 # Datasets & DataLoaders
 
 ## 一句话解释

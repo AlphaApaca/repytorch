@@ -1,3 +1,12 @@
+---
+publish: true
+date: 2026-09-30
+category: note
+tags: [PyTorch, tensor]
+summary: "tensor note"
+comments: true
+---
+
 # Tensors
 
 ## 一句话解释

@@ -1,3 +1,12 @@
+---
+publish: true
+date: 2026-09-30
+category: learning-log
+tags: [PyTorch, Quickstart]
+summary: "对pytorch流程有一个基本认识"
+comments: true
+---
+
 # 2026-09-30 · 本地环境配置和quickstart
 
 ## 今日目标
