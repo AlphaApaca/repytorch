@@ -126,7 +126,7 @@ Test Error:
  Accuracy: 65.3%, Avg loss: 1.073788 
 
 Done!
-Saved PyTorch Model State to /Users/alpaca/workplace/repytorch/outputs/tutorials/official_basics/00_quickstart/model.pth
+Saved PyTorch Model State to /outputs/tutorials/official_basics/00_quickstart/model.pth
 ```
 
 ## 小记

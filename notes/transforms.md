@@ -3,7 +3,7 @@ publish: true
 date: 2026-10-03
 category: note
 tags: [PyTorch, transform]
-summary: ""
+summary: "Transform简要解释"
 comments: true
 ---
 
