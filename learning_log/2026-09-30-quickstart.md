@@ -126,7 +126,7 @@ Test Error:
  Accuracy: 65.3%, Avg loss: 1.073788 
 
 Done!
-Saved PyTorch Model State to /outputs/tutorials/official_basics/00_quickstart/model.pth
+Saved PyTorch Model State to (local path, I have hided it)
 ```
 
 ## 小记
@@ -266,7 +266,7 @@ torch      → 提供张量、自动求导和模型训练能力
 
 ## 产出文件
 本地mac部署：[local-mac.md](../docs/local-mac.md)
-模型文件：[model.pth](../outputs/tutorials/official_basics/00_quickstart/model.pth)
+模型文件：`model.pth`（本地运行生成，未上传）
 
 ## 下一步
 
