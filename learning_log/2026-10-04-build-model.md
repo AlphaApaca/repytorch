@@ -29,7 +29,7 @@ print(f"Using {device} device")
 ```bash
 (repytorch) alpaca@Mac repytorch % python tutorials/official_basics/04_build-model/build-model.py
 Traceback (most recent call last):
-  File "/Users/alpaca/workplace/repytorch/tutorials/official_basics/04_build-model/build-model.py", line 7, in <module>
+  File "tutorials/official_basics/04_build-model/build-model.py", line 7, in <module>
     device = torch.accelerator.current_accelerator.type if torch.accelerator.is_available() else "cpu"
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 AttributeError: 'function' object has no attribute 'type'
