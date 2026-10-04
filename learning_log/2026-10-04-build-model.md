@@ -1,0 +1,104 @@
+---
+publish: true
+date: 2026-10-04
+category: learning-log
+tags: [PyTorch, Model]
+summary: "学会如何搭建一个基础的模型"
+comments: true
+---
+
+# 2026-10-4 · Build Model
+
+## 今天的目标
+理解如何搭建一个模型
+完成learning_log
+完成note
+
+## 阅读与运行
+阅读[Build Model](https://docs.pytorch.org/tutorials/beginner/basics/buildmodel_tutorial.html)
+
+## 我能解释的内容
+
+## 遇到的问题
+文档中，get device用的是下面的代码：
+```python
+device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
+print(f"Using {device} device")
+```
+但是我运行后显示。
+```bash
+(repytorch) alpaca@Mac repytorch % python tutorials/official_basics/04_build-model/build-model.py
+Traceback (most recent call last):
+  File "/Users/alpaca/workplace/repytorch/tutorials/official_basics/04_build-model/build-model.py", line 7, in <module>
+    device = torch.accelerator.current_accelerator.type if torch.accelerator.is_available() else "cpu"
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'function' object has no attribute 'type'
+```
+也就是说现如今没有type这个attribute。
+查阅[torch.accelerator.current_accelerator](https://docs.pytorch.org/docs/2.14/generated/torch.accelerator.current_accelerator.html#torch.accelerator.current_accelerator)文档后得知：
+> Return the device of the accelerator available at compilation time. If no accelerator were available at compilation time, returns None.
+也就是说现在这个可以直接返回可用accelerator。
+修改代码：
+```python
+device = torch.accelerator.current_accelerator if torch.accelerator.is_available() else "cpu"
+print(f"Using device: {device}")
+```
+运行得到：
+```bash
+(repytorch) alpaca@Mac repytorch % python tutorials/official_basics/04_build-model/build-model.py
+Using device: <function current_accelerator at 0x106309940>
+```
+疑似一个内存地址，但至少说明它仍能识别到accelerator，但是为什么不是mps？
+
+可以这样记录：
+
+### 1. 为什么会输出 `<function current_accelerator at ...>`？
+
+因为 `current_accelerator` 是函数，必须加 `()` 才会执行：
+
+```python
+torch.accelerator.current_accelerator   # 函数本身
+torch.accelerator.current_accelerator() # 返回设备，如 mps
+```
+
+所以正确写法是：
+
+```python
+device = torch.accelerator.current_accelerator()
+```
+
+### 2. 为什么不加 `.type` 也可以？
+
+`current_accelerator()` 返回 `torch.device` 对象，而 `.type` 返回设备名称字符串：
+
+```python
+device = torch.accelerator.current_accelerator()
+# torch.device("mps")
+
+device_type = device.type
+# "mps"
+```
+
+PyTorch 的 `.to()` 等接口同时接受这两种形式：
+
+```python
+model.to(torch.device("mps"))
+model.to("mps")
+```
+
+因此加不加 `.type` 都能使用。推荐保留完整的 `torch.device` 对象：
+
+```python
+device = torch.accelerator.current_accelerator(check_available=True)
+
+if device is None:
+    device = torch.device("cpu")
+```
+
+## 产出文件
+note [build-model.md](../notes/build-model.md)
+tutorial 练手[build-model.py](../tutorials/official_basics/04_build-model/build-model.py)
+learning log [2026-10-04-build-model.md](../learning_log/2026-10-04-build-model.md)
+
+## 下一步
+继续[Autograd](https://docs.pytorch.org/tutorials/beginner/basics/autogradqs_tutorial.html)
