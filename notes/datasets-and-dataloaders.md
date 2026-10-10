@@ -199,12 +199,15 @@ sample_idx = torch.randint(
 ).item()
 ```
 但教程使用 `size=(1,)` 更直观地表达“生成一个随机数”。
-
-## 仍不确定的问题
-
-创建datasets时的getitem具体发生了什么？
+### 创建datasets时，发生的事
+必须实现三个基础functions: __init__, __len__, __getitem__.
 ```python
-class CustomImageDataset(Dataset):
+import os
+import pandas as pd
+from torchvision.io import decode_image
+
+#创建一个名为 CustomImageDataset 继承 pytorch的Dataset的Python类，实现DataLoader能理解的数据访问方式（len，getitem）
+class CustomImageDataset(Dataset): 
     def __init__(self, annotations_file, img_dir, transform=None, target_transform=None):
         self.img_labels = pd.read_csv(annotations_file)
         self.img_dir = img_dir
@@ -224,4 +227,319 @@ class CustomImageDataset(Dataset):
             label = self.target_transform(label)
         return image, label
 ```
+#### 创建dataset本质
+定义一个 Python 类，让这个类遵守 PyTorch 数据集所要求的接口。
+对于这种可以通过索引读取到的数据集，最重要的是实现：
+```python
+__len__()
+__getitem__()
+```
+#### 用的时候：
+创建对象：
+```python
+dataset = CustomImageDataset(
+    annotations_file="labels.csv",
+    img_dir="images",
+)
+```
+获取长度：
+```python
+len(dataset) #用dataset.__len__()实现的
+```
+取某个对象：
+```python
+dataset[10] # 用dataset.__getitem__(10)实现的
+```
+#### __init__
+除了第一个参数 self，其他参数基本由类的设计者决定。
+PyTorch 不关心构造参数是什么，它主要关心创建完成后的对象能否正确响应：
+```python
+len(dataset)
+dataset[index]
+```
+__init__ 通常负责什么？
+通常负责：
+- 读取较小的标签文件；
+- 保存图片目录；
+- 保存 transform；
+- 建立文件列表；
+- 检查必要路径是否存在。
+例如：
+```python
+def __init__(self, annotations_file, img_dir, transform=None):
+    self.img_labels = pd.read_csv(annotations_file)
+    self.img_dir = img_dir
+    self.transform = transform
+```
+通常不建议在 __init__ 中一次性读取所有图片：
+```python
+# 数据量大时不建议
+self.images = [decode_image(path) for path in all_paths]
+```
+因为这可能一次占用大量内存。当前代码只在 __init__ 中读取 CSV，在 __getitem__ 被调用时才读取一张图片，内存利用更合理。
+
+#### __len__
+__len__ 应该返回数据集中的样本数量，并且通常是非负整。
+#### __getitem__
+__getitem__ 接收索引，返回该索引对应的一个样本。
+```python
+def __getitem__(self, idx):
+    # 从 CSV 第 idx 行读取图片文件名
+    img_path = os.path.join(
+        self.img_dir,
+        self.img_labels.iloc[idx, 0],
+    )
+
+    # 加载这一张图片
+    image = decode_image(img_path)
+
+    # 从 CSV 第 idx 行读取标签
+    label = self.img_labels.iloc[idx, 1]
+
+    # 对图片进行转换
+    if self.transform:
+        image = self.transform(image)
+
+    # 对标签进行转换
+    if self.target_transform:
+        label = self.target_transform(label)
+
+    return image, label
+```
+__getitem__ 不一定必须返回 (image, label)。也可以返回字典：
+```python
+return {
+    "image": image,
+    "label": label,
+    "path": img_path,
+}
+```
+如果返回元组：
+```python
+return image, label
+```
+训练循环通常写成：
+```python
+for images, labels in dataloader:
+    ...
+```
+如果返回字典：
+```python
+return {"image": image, "label": label}
+```
+训练循环就要写成：
+```python
+for batch in dataloader:
+    images = batch["image"]
+    labels = batch["label"]
+```
+#### 编写 Dataset 时的实用注意事项
+主要注意以下几点：
+1. __len__ 的数量必须与可用索引范围一致。
+2. __getitem__ 应该只读取一个样本，不要每次重新读取完整 CSV。
+3. 返回的图片和标签格式要保持稳定。
+4. 图片 transform 和标签 transform 要分清：
+```python
+self.transform         # 处理图片
+self.target_transform  # 处理标签
+```
+5. 同一个 batch 中的图片通常要具有相同形状，否则默认 DataLoader 无法直接堆叠。
+6. 分类任务的标签最终通常需要是整数类型，例如：
+```python
+label = int(self.img_labels.iloc[idx, 1])
+```
+7. 路径可以使用 Path 写得更清晰：
+```python
+from pathlib import Path
+self.img_dir = Path(img_dir)
+img_path = self.img_dir / self.img_labels.iloc[idx, 0]
+```
+最简洁的总结是：
+> 自定义 Dataset 是一个 Python 类；__init__ 的参数和内部实现由我们设计，而 __len__ 和 __getitem__ 是为了让 PyTorch 知道“有多少数据”和“如何按索引读取一个样本”。self 相当于 Java 的 this，只不过 Python 要把它显式写在实例方法参数中。
+
+#### 图片 transform 和标签 transform是什么？有什么区别？
+transform        → 处理输入数据，例如图片
+target_transform → 处理目标值，例如分类标签
+##### 图片 transform
+图片 transform 用来把原始图片转换成适合模型输入的形式。
+常见操作包括：
+- 调整图片尺寸
+- 转成浮点 Tensor
+- 将像素值缩放到 [0, 1]
+- 标准化
+- 随机翻转、旋转、裁剪等数据增强
+```python
+from torchvision.transforms import v2
+import torch
+
+image_transform = v2.Compose([
+    v2.Resize((224, 224)),
+    v2.ToDtype(torch.float32, scale=True),
+    v2.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225],
+    ),
+])
+```
+使用：
+```python
+dataset = CustomImageDataset(
+    annotations_file="labels.csv",
+    img_dir="images",
+    transform=image_transform,
+)
+```
+原图片可能为：
+```Plain text
+类型：uint8
+形状：(3, 500, 600)
+范围：0～255
+```
+经过transform后可能变成：
+```Plain text
+类型：float32
+形状：(3, 224, 224)
+经过标准化的数值
+```
+##### 标签target_transform
+target 是模型要预测的目标。在分类任务中通常就是标签。
+例如原始 CSV 中可能用文字表示类别：
+```text
+cat
+dog
+bird
+```
+但模型训练通常需要数字标签：
+```text
+cat  → 0
+dog  → 1
+bird → 2
+```
+可以定义：
+```python
+label_to_index = {
+    "cat": 0,
+    "dog": 1,
+    "bird": 2,
+}
+target_transform = lambda label: label_to_index[label]
+```
+然后：
+```python
+dataset = CustomImageDataset(
+    annotations_file="labels.csv",
+    img_dir="images",
+    transform=image_transform,
+    target_transform=target_transform,
+)
+```
+读取样本时：
+```python
+image, label = dataset[0]
+```
+得到的 `label` 就不再是 `"cat"`，而是：
+```python
+0
+```
+也可以把标签转换为 Tensor：
+```python
+target_transform = lambda label: torch.tensor(
+    label,
+    dtype=torch.long,
+)
+```
+之所以经常使用 `torch.long`，是因为分类任务中的 `nn.CrossEntropyLoss` 通常要求类别标签是整数索引。
+
+##### 两者的区别
+
+| 项目 | `transform` | `target_transform` |
+|---|---|---|
+| 处理对象 | 输入图片 | 目标标签 |
+| 常见输入 | 图片 Tensor | 数字或字符串标签 |
+| 常见操作 | 缩放、标准化、翻转 | 类别映射、类型转换 |
+| 输出用途 | 送入模型 | 与模型预测结果计算损失 |
+
+一个样本的处理流程是：
+```text
+图片文件 → decode_image → transform → 模型输入
+CSV标签  → 读取标签     → target_transform → 训练目标
+```
+##### 为什么需要分开设置？
+因为图片和标签的处理逻辑通常完全不同。
+例如：
+```python
+image_transform = v2.Compose([
+    v2.Resize((224, 224)),
+    v2.RandomHorizontalFlip(),
+    v2.ToDtype(torch.float32, scale=True),
+])
+target_transform = lambda label: torch.tensor(
+    label,
+    dtype=torch.long,
+)
+```
+不能用 `Resize` 处理分类编号，也不能用标签的整数转换处理图片，因此需要分开。
+###### 不传 transform 会怎样？
+构造方法中的默认值是：
+```python
+transform=None
+target_transform=None
+```
+所以：
+
+```python
+if self.transform:
+```
+在没有传入 transform 时为 `False`，直接跳过处理。
+例如：
+```python
+dataset = CustomImageDataset(
+    annotations_file="labels.csv",
+    img_dir="images",
+)
+```
+此时返回原始解码图片和原始标签。
+##### 一个完整例子
+
+```python
+import torch
+from torchvision.transforms import v2
+image_transform = v2.Compose([
+    v2.Resize((224, 224)),
+    v2.ToDtype(torch.float32, scale=True),
+])
+target_transform = lambda label: torch.tensor(
+    int(label),
+    dtype=torch.long,
+)
+dataset = CustomImageDataset(
+    annotations_file="labels.csv",
+    img_dir="images",
+    transform=image_transform,
+    target_transform=target_transform,
+)
+image, label = dataset[0]
+print(image.shape)
+# torch.Size([3, 224, 224])
+print(image.dtype)
+# torch.float32
+print(label.dtype)
+# torch.int64
+```
+需要注意：对于目标检测、图像分割等任务，`target` 可能不只是一个类别编号，还可能包含：
+- 边界框
+- 分割掩码
+- 关键点
+这时某些图片变换也必须同步作用于 target。例如图片水平翻转后，边界框坐标也必须一起翻转。此时通常需要设计一个同时处理二者的变换：
+```python
+image, target = joint_transform(image, target)
+```
+但对于普通图片分类，可以先简单理解为：
+```text
+transform        → 把图片变成适合模型读取的输入
+target_transform → 把标签变成适合计算损失的目标
+```
+
+## 仍不确定的问题
+
 transform具体是什么？
