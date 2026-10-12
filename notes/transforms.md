@@ -887,4 +887,413 @@ v2.Lambda
 → 将整数标签转换为长度为 10 的浮点 one-hot Tensor
 ```
 
+### 怎么写transform
 如何写好一个transform？是说我们首先要知道我们数据集中数据“形状”是什么样的，并且知道我们训练所需的数据“形状”是什么样的，然后对应转换就好了吗？那么如何确定这两者呢？
+你的理解基本正确，但要把“形状”扩展成更完整的概念：
+
+> 写 transform，就是把原始样本的数据格式，转换成模型和损失函数所要求的格式。
+
+这里的“格式”不只包括 `shape`，还包括：
+
+- 数据类型：PIL Image、NumPy、Tensor
+- `shape`：`(H, W)`、`(C, H, W)` 等
+- `dtype`：`uint8`、`float32`、`int64`
+- 数值范围：`[0, 255]`、`[0, 1]`
+- 维度含义：哪个是通道、高度、宽度
+- 标签形式：类别索引、one-hot、边界框、掩码
+- 数据语义：翻转图片时，标签或边界框是否也要改变
+
+可以把它看成一份数据契约：
+
+```text
+原始数据格式
+      ↓ transform
+模型和损失函数要求的格式
+```
+
+#### 1. 如何确定原始数据是什么样的？
+
+最可靠的方法是：**先不使用 transform，直接取一个样本检查。**
+
+例如 FashionMNIST：
+
+```python
+from torchvision import datasets
+
+raw_ds = datasets.FashionMNIST(
+    root="data",
+    train=True,
+    download=True,
+    transform=None,
+    target_transform=None,
+)
+
+image, label = raw_ds[0]
+
+print(type(image))
+print(image.size)
+print(image.mode)
+
+print(type(label))
+print(label)
+```
+
+可能输出：
+
+```text
+<class 'PIL.Image.Image'>
+(28, 28)
+L
+<class 'int'>
+9
+```
+
+这说明：
+
+```text
+图片类型：PIL Image
+图片大小：28×28
+图片模式：L，即单通道灰度图
+标签类型：Python int
+标签取值：0～9
+```
+
+如果原始数据已经是 Tensor，可以检查：
+
+```python
+print(type(image))
+print(image.shape)
+print(image.dtype)
+print(image.min(), image.max())
+```
+
+因此，面对陌生数据集时，至少检查：
+
+```python
+sample = dataset[0]
+print(type(sample))
+print(sample)
+```
+
+并进一步检查其中每个字段的：
+
+```text
+type
+shape
+dtype
+min/max
+```
+
+除此之外，还应该查看数据集文档，确认每个维度和标签具体表示什么。仅仅看到 `(3, 224, 224)`，并不能自动确定它是 `(C, H, W)`，还是其他含义。
+
+#### 2. 如何确定模型需要什么数据？
+
+主要看三个地方：
+
+1. 模型第一层或模型文档；
+2. 模型的 `forward()`；
+3. 使用的损失函数。
+
+##### 根据模型第一层判断
+
+例如：
+
+```python
+nn.Conv2d(
+    in_channels=1,
+    out_channels=32,
+    kernel_size=3,
+)
+```
+
+说明模型希望单张图片的形状类似：
+
+```text
+(C, H, W) = (1, H, W)
+```
+
+DataLoader 组成 batch 后则是：
+
+```text
+(N, C, H, W)
+```
+
+例如：
+
+```text
+(32, 1, 28, 28)
+```
+
+其中 `N=32` 是 batch size。这个 batch 维通常由 DataLoader 自动添加，transform 不需要处理。
+
+如果第一层是：
+
+```python
+nn.Linear(784, 512)
+```
+
+说明进入这个线性层的数据最后一维需要有 784 个特征。FashionMNIST 的：
+
+```text
+1 × 28 × 28 = 784
+```
+
+因此模型中通常会先执行：
+
+```python
+x = torch.flatten(x, start_dim=1)
+```
+
+把：
+
+```text
+(N, 1, 28, 28)
+```
+
+变成：
+
+```text
+(N, 784)
+```
+
+这个 Flatten 可以写在模型中，不一定要写在 transform 中。
+
+##### 根据损失函数判断标签格式
+
+例如：
+
+```python
+loss_fn = nn.CrossEntropyLoss()
+```
+
+普通单标签分类推荐的格式是：
+
+```text
+模型输出：float32，形状 (N, C)
+标签：    int64，形状 (N,)
+```
+
+其中：
+
+- `N` 是 batch size；
+- `C` 是类别数。
+
+例如 FashionMNIST：
+
+```text
+logits.shape = (32, 10)
+labels.shape = (32,)
+labels.dtype = torch.int64
+```
+
+如果使用：
+
+```python
+nn.BCEWithLogitsLoss()
+```
+
+目标通常需要和模型输出具有相同形状，并且是浮点数：
+
+```text
+logits.shape  = (N, C)
+targets.shape = (N, C)
+targets.dtype = float32
+```
+
+所以标签是否需要 one-hot，主要由损失函数要求决定，而不是由数据集本身决定。
+
+#### 3. FashionMNIST 应该怎样设计 transform？
+
+如果使用普通模型和 `CrossEntropyLoss`，最小转换就足够了：
+
+```python
+transform = v2.Compose([
+    v2.ToImage(),
+    v2.ToDtype(torch.float32, scale=True),
+])
+```
+
+它完成：
+
+```text
+PIL Image
+    ↓ ToImage
+形状为 (1, 28, 28) 的图像 Tensor
+    ↓ ToDtype
+float32、像素范围 [0, 1]
+```
+
+标签不需要转换：
+
+```python
+ds = datasets.FashionMNIST(
+    root="data",
+    train=True,
+    download=True,
+    transform=transform,
+)
+```
+
+如果模型要求固定尺寸，例如 `(1, 32, 32)`，再增加：
+
+```python
+transform = v2.Compose([
+    v2.ToImage(),
+    v2.Resize((32, 32)),
+    v2.ToDtype(torch.float32, scale=True),
+])
+```
+
+如果预训练模型要求 3 通道、224×224 和特定均值方差，那么转换会更加完整：
+
+```python
+transform = v2.Compose([
+    v2.ToImage(),
+    v2.Resize((224, 224)),
+    v2.Grayscale(num_output_channels=3),
+    v2.ToDtype(torch.float32, scale=True),
+    v2.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225],
+    ),
+])
+```
+
+这些步骤不是越多越好，而是由模型的数据契约决定。
+
+#### 4. 怎样验证 transform 写对了？
+
+先检查一个转换后的样本：
+
+```python
+image, label = ds[0]
+
+print("image type:", type(image))
+print("image shape:", image.shape)
+print("image dtype:", image.dtype)
+print("image range:", image.min().item(), image.max().item())
+
+print("label type:", type(label))
+print("label:", label)
+```
+
+FashionMNIST 应该类似：
+
+```text
+image shape: torch.Size([1, 28, 28])
+image dtype: torch.float32
+image range: 0.0 1.0
+label: 9
+```
+
+然后检查一个 batch：
+
+```python
+from torch.utils.data import DataLoader
+
+loader = DataLoader(ds, batch_size=32)
+images, labels = next(iter(loader))
+
+print(images.shape)
+print(images.dtype)
+print(labels.shape)
+print(labels.dtype)
+```
+
+对于普通 FashionMNIST 分类，预期是：
+
+```text
+images.shape = (32, 1, 28, 28)
+images.dtype = float32
+
+labels.shape = (32,)
+labels.dtype = int64
+```
+
+最后进行一次完整试运行：
+
+```python
+logits = model(images)
+loss = loss_fn(logits, labels)
+
+print(logits.shape)
+print(loss)
+```
+
+如果能够完成一次：
+
+```text
+取样本 → 组成 batch → 模型前向传播 → 计算 loss
+```
+
+就说明最基本的数据格式是匹配的。
+
+也可以增加断言：
+
+```python
+assert images.ndim == 4
+assert images.shape[1] == 1
+assert images.dtype == torch.float32
+assert labels.dtype == torch.int64
+assert logits.shape == (32, 10)
+```
+
+#### 5. 一个实用的 transform 设计流程
+
+可以按照以下顺序：
+
+```text
+1. 明确任务
+   分类、回归、检测还是分割？
+
+2. 检查原始样本
+   type、shape、dtype、数值范围、标签含义
+
+3. 查看模型输入要求
+   通道数、尺寸、维度顺序、数值范围
+
+4. 查看损失函数要求
+   标签是整数索引还是浮点向量？
+
+5. 编写最小 transform
+   只添加真正需要的转换
+
+6. 检查转换后的单个样本
+
+7. 检查 DataLoader 生成的 batch
+
+8. 完成一次 forward 和 loss 试运行
+```
+
+#### 6. 写 transform 时还应注意什么？
+
+训练集可以使用随机数据增强：
+
+```python
+train_transform = v2.Compose([
+    v2.ToImage(),
+    v2.RandomHorizontalFlip(),
+    v2.ToDtype(torch.float32, scale=True),
+])
+```
+
+验证集和测试集通常不要使用随机增强：
+
+```python
+eval_transform = v2.Compose([
+    v2.ToImage(),
+    v2.ToDtype(torch.float32, scale=True),
+])
+```
+
+因为测试时希望同一张图片每次得到一致结果。
+
+对于检测和分割任务，还要同步转换图片和目标。例如水平翻转图片时：
+
+- 边界框也必须翻转；
+- 分割 mask 也必须翻转；
+- 关键点坐标也必须改变。
+
+所以最准确的总结是：
+
+> 写好 transform，首先要明确原始样本的数据契约，再明确模型和损失函数的输入契约，最后用尽可能少的转换连接两者，并通过单样本、batch、forward 和 loss 四层检查进行验证。
